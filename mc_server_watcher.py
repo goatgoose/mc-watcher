@@ -8,7 +8,8 @@ config = json.load(open("config.json"))
 ec2 = boto3.client(
     "ec2",
     aws_access_key_id=config["aws_access_key_id"],
-    aws_secret_access_key=config["aws_secret_access_key"]
+    aws_secret_access_key=config["aws_secret_access_key"],
+    region_name=config["aws_region"]
 )
 
 
@@ -33,10 +34,28 @@ class MyClient(discord.Client):
     def __init__(self, *, intents, **options):
         super().__init__(intents=intents, **options)
 
-        self.instance_name = config["watcher_instance_name"]
+        self.instance_names = config["instance_names"]
+        self.commands_channel_name = "server-commands"
 
     async def on_ready(self):
         print("Logged on as", self.user)
+
+        await self.create_channels()
+
+    async def create_channels(self):
+        for guild in self.guilds:
+            for instance_name in self.instance_names:
+                category = discord.utils.get(guild.categories, name=instance_name)
+                if not category:
+                    print(f"Creating {instance_name} category")
+                    await guild.create_category(instance_name)
+
+                category = discord.utils.get(guild.categories, name=instance_name)
+                assert category is not None
+
+                channel = discord.utils.get(category.text_channels, name=self.commands_channel_name)
+                if not channel:
+                    await category.create_text_channel(self.commands_channel_name)
 
     async def on_message(self, message):
         if message.author == self.user:
@@ -44,12 +63,21 @@ class MyClient(discord.Client):
         if not message.content.startswith("!"):
             return
 
+        channel = message.channel
+        if not channel.category:
+            return
+
+        instance_name = channel.category.name
+        if instance_name not in self.instance_names:
+            await message.channel.send(f"Instance not found: {instance_name}")
+            return
+
         command = message.content[1:]
 
         if command == "stop":
-            await message.channel.send(f"Stopping {self.instance_name}...")
+            await message.channel.send(f"Stopping {instance_name}...")
 
-            instance = describe_instance(self.instance_name)
+            instance = describe_instance(instance_name)
             state = instance["State"]["Name"]
 
             if state != "running":
@@ -64,12 +92,12 @@ class MyClient(discord.Client):
                 print(e)
                 return
 
-            await message.channel.send(f"Stopped {self.instance_name}.")
+            await message.channel.send(f"Stopped {instance_name}.")
 
         if command == "start":
-            await message.channel.send(f"Starting {self.instance_name}...")
+            await message.channel.send(f"Starting {instance_name}...")
 
-            instance = describe_instance(self.instance_name)
+            instance = describe_instance(instance_name)
             state = instance["State"]["Name"]
 
             if state != "stopped":
@@ -84,7 +112,7 @@ class MyClient(discord.Client):
                 print(e)
                 return
 
-            await message.channel.send(f"Started {self.instance_name}.")
+            await message.channel.send(f"Started {instance_name}.")
 
 
 intents = discord.Intents.all()
