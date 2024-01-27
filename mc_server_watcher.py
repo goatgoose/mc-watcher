@@ -74,26 +74,6 @@ class MyClient(discord.Client):
 
         command = message.content[1:]
 
-        if command == "stop":
-            await message.channel.send(f"Stopping {instance_name}...")
-
-            instance = describe_instance(instance_name)
-            state = instance["State"]["Name"]
-
-            if state != "running":
-                await message.channel.send(f"Cannot stop instance. Instance state: {state}")
-                return
-
-            instance_id = instance["InstanceId"]
-            try:
-                ec2.stop_instances(InstanceIds=[instance_id], DryRun=False)
-            except ClientError as e:
-                await message.channel.send("Failed to stop instance.")
-                print(e)
-                return
-
-            await message.channel.send(f"Stopped {instance_name}.")
-
         if command == "start":
             await message.channel.send(f"Starting {instance_name}...")
 
