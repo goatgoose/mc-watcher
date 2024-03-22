@@ -22,6 +22,8 @@ def describe_instance(name_tag):
     )
 
     reservations = response["Reservations"]
+    if len(reservations) == 0:
+        return None
     assert len(reservations) == 1
 
     instances = reservations[0]["Instances"]
@@ -68,16 +70,17 @@ class MyClient(discord.Client):
             return
 
         instance_name = channel.category.name
-        if instance_name not in self.instance_names:
-            await message.channel.send(f"Instance not found: {instance_name}")
-            return
 
         command = message.content[1:]
 
         if command == "start":
+            instance = describe_instance(instance_name)
+            if instance is None:
+                await message.channel.send(f"Instance not found: {instance_name}")
+                return
+
             await message.channel.send(f"Starting {instance_name}...")
 
-            instance = describe_instance(instance_name)
             state = instance["State"]["Name"]
 
             if state != "stopped":
