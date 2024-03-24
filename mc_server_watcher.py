@@ -81,6 +81,34 @@ class MyClient(discord.Client):
 
             await message.channel.send(f"Started {instance_name}.")
 
+        elif command == "ip":
+            instance = describe_instance(instance_name)
+            if instance is None:
+                await message.channel.send(f"Instance not found: {instance_name}.")
+                return
+
+            network_interfaces = instance["NetworkInterfaces"]
+            if len(network_interfaces) != 1:
+                await message.channel.send(f"Unable to get IP address for {instance_name}")
+                return
+
+            network_interface = network_interfaces[0]
+            if "Association" not in network_interface:
+                await message.channel.send(f"Unable to get IP address for {instance_name}. Is the server online?")
+                return
+
+            association = network_interface["Association"]
+            if "PublicIp" not in association:
+                await message.channel.send(f"Unable to get IP address for {instance_name}")
+                return
+
+            stable = False
+            if "IpOwnerId" in association and association["IpOwnerId"] != "amazon":
+                stable = True
+            stability = "stable IP" if stable else "dynamic IP"
+
+            await message.channel.send(f"IP for {instance_name}: {association['PublicIp']} ({stability})")
+
 
 intents = discord.Intents.all()
 client = MyClient(intents=intents)
