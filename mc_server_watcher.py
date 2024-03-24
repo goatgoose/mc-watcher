@@ -1,3 +1,4 @@
+import asyncio
 import json
 import discord
 import boto3
@@ -37,9 +38,39 @@ class MyClient(discord.Client):
         super().__init__(intents=intents, **options)
 
         self.commands_channel_name = "server-commands"
+        self.write_dynamic_ip_tasks = {}
 
     async def on_ready(self):
         print("Logged on as", self.user)
+
+    @staticmethod
+    async def write_dynamic_ip(instance_name, channel):
+        for i in range(10):
+            await asyncio.sleep(1)
+
+            instance = describe_instance(instance_name)
+            if instance is None:
+                return
+
+            network_interfaces = instance["NetworkInterfaces"]
+            if len(network_interfaces) != 1:
+                return
+
+            network_interface = network_interfaces[0]
+            if "Association" not in network_interface:
+                continue
+
+            association = network_interface["Association"]
+            if "PublicIp" not in association:
+                continue
+
+            stable = False
+            if "IpOwnerId" in association and association["IpOwnerId"] != "amazon":
+                stable = True
+
+            if not stable:
+                await channel.send(f"IP for {instance_name}: \n```{association['PublicIp']}```")
+            return
 
     async def on_message(self, message):
         if message.author == self.user:
@@ -81,6 +112,10 @@ class MyClient(discord.Client):
 
             await message.channel.send(f"Started {instance_name}.")
 
+            self.write_dynamic_ip_tasks[instance_name] = asyncio.create_task(
+                self.write_dynamic_ip(instance_name, message.channel)
+            )
+
         elif command == "ip":
             instance = describe_instance(instance_name)
             if instance is None:
@@ -107,7 +142,7 @@ class MyClient(discord.Client):
                 stable = True
             stability = "stable IP" if stable else "dynamic IP"
 
-            await message.channel.send(f"IP for {instance_name}: {association['PublicIp']} ({stability})")
+            await message.channel.send(f"IP for {instance_name} ({stability}): \n```{association['PublicIp']}```")
 
 
 intents = discord.Intents.all()
