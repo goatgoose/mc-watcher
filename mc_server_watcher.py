@@ -36,28 +36,10 @@ class MyClient(discord.Client):
     def __init__(self, *, intents, **options):
         super().__init__(intents=intents, **options)
 
-        self.instance_names = config["instance_names"]
         self.commands_channel_name = "server-commands"
 
     async def on_ready(self):
         print("Logged on as", self.user)
-
-        await self.create_channels()
-
-    async def create_channels(self):
-        for guild in self.guilds:
-            for instance_name in self.instance_names:
-                category = discord.utils.get(guild.categories, name=instance_name)
-                if not category:
-                    print(f"Creating {instance_name} category")
-                    await guild.create_category(instance_name)
-
-                category = discord.utils.get(guild.categories, name=instance_name)
-                assert category is not None
-
-                channel = discord.utils.get(category.text_channels, name=self.commands_channel_name)
-                if not channel:
-                    await category.create_text_channel(self.commands_channel_name)
 
     async def on_message(self, message):
         if message.author == self.user:
@@ -67,6 +49,8 @@ class MyClient(discord.Client):
 
         channel = message.channel
         if not channel.category:
+            return
+        if channel.name != self.commands_channel_name:
             return
 
         instance_name = channel.category.name
