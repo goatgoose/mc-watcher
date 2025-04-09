@@ -106,8 +106,12 @@ class MyClient(discord.Client):
             try:
                 ec2.start_instances(InstanceIds=[instance_id], DryRun=False)
             except ClientError as e:
-                await message.channel.send("Failed to start instance.")
-                print(e)
+                await message.channel.send(
+                    f"Failed to start instance:\n"
+                    f"```\n"
+                    f"{str(e)}\n"
+                    f"```"
+                )
                 return
 
             await message.channel.send(f"Started {instance_name}.")
